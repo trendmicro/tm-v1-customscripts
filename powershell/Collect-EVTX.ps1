@@ -1,58 +1,61 @@
-﻿#Check for admin rights
-if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
- {
-   Write-Error "Not running as admin. Run the script with elevated credentials"
-   Return
- }
+﻿# Check for admin rights
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Error "Not running as admin. Run the script with elevated credentials"
+    exit
+}
 
 $EVTsourceDirectory   = "C:\windows\system32\config\*.evt"
 $EVTXsourceDirectory  = "C:\windows\system32\winevt\Logs\*.evtx"
 $destinationDirectory = "C:\Windows\Temp\VisionOne-EVTX-backup\"
-$zipfilename = "C:\data\VisionOne-EVTX-Logs.zip"
-    
-function Zip-Files(
-        [Parameter(Position=0, Mandatory=$true, ValueFromPipeline=$false)]
+$zipfilename = "C:\data\VisionOne-EVTX-Logs.zip" #User configurable -- Change the directory to wherever you'd like to have the file placed on the local system
+
+# Function to zip files
+function Zip-Files {
+    param (
         [string] $zipfilename,
-        [Parameter(Position=1, Mandatory=$true, ValueFromPipeline=$false)]
         [string] $destinationDirectory,
-        [Parameter(Position=2, Mandatory=$false, ValueFromPipeline=$false)]
-        [bool] $overwrite)
+        [bool] $overwrite = $false
+    )
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $compressionLevel = [System.IO.Compression.CompressionLevel]::Optimal
 
-{
-   Add-Type -Assembly System.IO.Compression.FileSystem
-   $compressionLevel = [System.IO.Compression.CompressionLevel]::Optimal
-
-    if ($overwrite -eq $true )
-    {
-        if (Test-Path $zipfilename)
-        {
-            Remove-Item $zipfilename
-        }
+    if ($overwrite -and (Test-Path $zipfilename)) {
+        Remove-Item $zipfilename -ErrorAction Stop
     }
 
-    [System.IO.Compression.ZipFile]::CreateFromDirectory($destinationDirectory, $zipfilename, $compressionLevel, $false)
-}
-#Create V1 temp directory in C:\windows\temp
-New-Item -Path "C:\Windows\Temp" -Name "VisionOne-EVTX-backup" -ItemType "directory"
-Get-WmiObject -Class Win32_OperatingSystem | ForEach-Object -MemberName Caption 
-$version= (Get-CimInstance Win32_OperatingSystem).version
-$length= $version.Length
-$index= $version.IndexOf(".")
-[int]$windows= $version.Remove($index,$length-2)
-$windows
-
-if ($windows -lt 6)
-{
-#Copy EVT (XP/NT/2000) contents from source to destination
-Copy-item -Force -Recurse -Verbose $EVTsourceDirectory -Destination $destinationDirectory
-}
-else
-{
-#Copy EVTX (2008 and later) contents from source to destination
-Copy-item -Force -Recurse -Verbose $EVTXsourceDirectory -Destination $destinationDirectory
+    try {
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($destinationDirectory, $zipfilename, $compressionLevel, $false)
+        Write-Host "Files zipped successfully."
+    }
+    catch {
+        Write-Error "Error while zipping files: $_"
+    }
 }
 
-#Start the archive procedure and save the output to destination directory
+# Create temp directory if it doesn't exist
+if (-Not (Test-Path $destinationDirectory)) {
+    New-Item -Path "C:\Windows\Temp" -Name "VisionOne-EVTX-backup" -ItemType "directory"
+}
+
+# Get Windows version
+$version = (Get-CimInstance Win32_OperatingSystem).Version
+$index = $version.IndexOf(".")
+if ($index -ge 0) {
+    [int]$windows = [int]$version.Substring(0, $index)
+} else {
+    Write-Error "Invalid version format"
+    exit
+}
+
+# Copy the appropriate logs based on Windows version
+if ($windows -lt 6) {
+    Copy-Item -Force -Recurse -Verbose $EVTsourceDirectory -Destination $destinationDirectory -ErrorAction Stop
+} else {
+    Copy-Item -Force -Recurse -Verbose $EVTXsourceDirectory -Destination $destinationDirectory -ErrorAction Stop
+}
+
+# Start the archive procedure and save the output to destination directory
 Zip-Files $zipfilename $destinationDirectory $true
-#delete copies of EVTX files in Temp folder 
-#Remove-Item -LiteralPath $destinationDirectory -Force -Recurse 
+
+# Cleanup temp files
+Remove-Item -LiteralPath $destinationDirectory -Force -Recurse
