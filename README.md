@@ -10,11 +10,11 @@ Documentation will be updated upon release.
 
 ### Code of Conduct
 
-Trend Micro has adopted a [Code of Conduct](CODE_OF_CONDUCT.md) that we expect project participants to adhere to. Please read the [full text](CODE_OF_CONDUCT.md) to understand what actions will and will not be tolerated.
+Trend Micro has adopted a [Code of Conduct](https://github.com/trendmicro/tm-v1/blob/main/CODE_OF_CONDUCT.md) that we expect project participants to adhere to. Please read the [full text](https://github.com/trendmicro/tm-v1/blob/main/CODE_OF_CONDUCT.md) to understand what actions will and will not be tolerated.
 
 ### Contributing Guide
 
-Read our [contributing guide](CONTRIBUTING.md) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Trend Vision One.
+Read our [contributing guide](https://github.com/trendmicro/tm-v1/blob/main/CONTRIBUTING.md) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Trend Vision One.
 
 ## Community
 
