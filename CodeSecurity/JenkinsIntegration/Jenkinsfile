@@ -1,0 +1,64 @@
+
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'IMAGE', defaultValue: 'nginx:latest')
+        string(name: 'TMAS_REGION', defaultValue: 'us-east-1')
+    }
+
+    stages {
+        stage('TrendAI Code Security Scan') {
+            steps {
+                withCredentials([string(
+                    credentialsId: 'tmas-api-key',
+                    variable: 'TMAS_API_KEY'
+                )]) {
+                    script {
+                        sh '''
+                            set -eu
+                            mkdir -p tools
+
+                            curl -fsSL \
+                              https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz \
+                              | tar -xz -C tools tmas
+
+                            chmod +x tools/tmas
+                        '''
+
+                        def rc = sh(
+                            script: '''
+                                set +x
+                                rm -f tmas-results.json
+
+                                ./tools/tmas scan "registry:${IMAGE}" \
+                                  -VMS --region "$TMAS_REGION" \
+                                  --evaluatePolicy \
+                                  --report-all-fixed-versions \
+                                  --output json=tmas-results.json \
+                                  > tmas-scan.log 2>&1
+                            ''',
+                            returnStatus: true
+                        )
+
+                        if (rc == 2) {
+                            error('SECURITY GATE BLOCKED: Policy violation')
+                        }
+                        if (rc != 0 || !fileExists('tmas-results.json')) {
+                            error("TMAS scan failed: exit ${rc}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts(
+                artifacts: 'tmas-results.json,tmas-scan.log',
+                allowEmptyArchive: true
+            )
+        }
+    }
+}
